@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Canvas Animation</title>
+  </head>
+  <body>
+    <canvas
+      id="emooa-canvas"
+      style="border: 1px solid #eee; height: 100%; width: 100%"
+    ></canvas>
+
+    <script>
+      function getRandomColor(alpha = 1) {
+        // 生成随机的红、绿、蓝分量
+        const r = Math.floor(Math.random() * 256);
+        const g = Math.floor(Math.random() * 256);
+        const b = Math.floor(Math.random() * 256);
+
+        // 将分量组合成RGB颜色
+        const color = `rgb(${r}, ${g}, ${b}, ${alpha})`;
+
+        return color;
+      }
+
+      const canvas = document.getElementById("emooa-canvas");
+      if (!canvas) {
+        throw new Error("Canvas element not found");
+      }
+      const ctx = canvas?.getContext?.("2d");
+      // 获取 Canvas 的实际显示大小
+      const displayWidth = canvas.clientWidth;
+      const displayHeight = canvas.clientHeight;
+
+      // 将 Canvas 的分辨率设置为实际显示大小
+      canvas.width = displayWidth;
+      canvas.height = displayHeight;
+
+      const width = canvas.width;
+      const height = canvas.height;
+
+      const stroke = "#fff";
+
+      const getJSON = function (url) {
+        const promise = new Promise(function (resolve, reject) {
+          const handler = function () {
+            if (this.readyState !== 4) {
+              return;
+            }
+            if (this.status === 200) {
+              resolve(this.response);
+            } else {
+              reject(new Error(this.statusText));
+            }
+          };
+          const client = new XMLHttpRequest();
+          client.open("GET", url);
+          client.onreadystatechange = handler;
+          client.responseType = "json";
+          client.setRequestHeader("Accept", "application/json");
+          client.send();
+        });
+        return promise;
+      };
+
+      getJSON("https://cdn.emooa.com/file/geojson/100000.json").then((v) => {
+        const data = v.features.map((item) => item.geometry);
+        const longitudes = [].concat(
+          ...[].concat(
+            ...data.map((item) => {
+              const coordinates = item.coordinates || [];
+              switch (item.type) {
+                case "Point":
+                  return typeof coordinates[0] === "number"
+                    ? coordinates[0]
+                    : [].concat(
+                        ...coordinates.map((coordinate) => coordinate[0])
+                      );
+                case "LineString":
+                  return [].concat(
+                    ...coordinates.map((coordinate) => coordinate[0])
+                  );
+                case "MultiLineString":
+                  return [].concat(
+                    ...coordinates.map((coordinate) =>
+                      coordinate.map((coord) => coord[0])
+                    )
+                  );
+                case "Polygon":
+                  return [].concat(
+                    ...coordinates.map((coordinate) =>
+                      coordinate.map((coord) => coord[0])
+                    )
+                  );
+                case "MultiPolygon":
+                  return [].concat(
+                    ...coordinates.map((coordinate) =>
+                      coordinate.map((coord) => coord.map((c) => c[0]))
+                    )
+                  );
+                default:
+                  return [];
+              }
+            })
+          )
+        );
+        const latitudes = [].concat(
+          ...[].concat(
+            ...data.map((item) => {
+              const coordinates = item.coordinates || [];
+              switch (item.type) {
+                case "Point":
+                  return typeof coordinates[1] === "number"
+                    ? coordinates[1]
+                    : [].concat(
+                        ...coordinates.map((coordinate) => coordinate[1])
+                      );
+                case "LineString":
+                  return [].concat(
+                    ...coordinates.map((coordinate) => coordinate[1])
+                  );
+                case "MultiLineString":
+                  return [].concat(
+                    ...coordinates.map((coordinate) =>
+                      coordinate.map((coord) => coord[1])
+                    )
+                  );
+                case "Polygon":
+                  return [].concat(
+                    ...coordinates.map((coordinate) =>
+                      coordinate.map((coord) => coord[1])
+                    )
+                  );
+                case "MultiPolygon":
+                  return [].concat(
+                    ...coordinates.map((coordinate) =>
+                      coordinate.map((coord) => coord.map((c) => c[1]))
+                    )
+                  );
+                default:
+                  return [];
+              }
+            })
+          )
+        );
+
+        const xMax = longitudes.reduce(function (max, current) {
+          return Math.max(max, current);
+        }, -Infinity); // 初始值设置为负无穷，以确保数组中的任何值都能成为最大值
+
+        const xMin = longitudes.reduce(function (min, current) {
+          return Math.min(min, current);
+        }, Infinity); // 初始值设置为正无穷，以确保数组中的任何值都能成为最小值
+
+        const yMax = latitudes.reduce(function (max, current) {
+          return Math.max(max, current);
+        }, -Infinity); // 初始值设置为负无穷，以确保数组中的任何值都能成为最大值
+
+        const yMin = latitudes.reduce(function (min, current) {
+          return Math.min(min, current);
+        }, Infinity); // 初始值设置为正无穷，以确保数组中的任何值都能成为最小值
+
+        // // 拿到方向轴的最大最小值
+        // const xMax = Math.max(...longitudes);
+        // const xMin = Math.min(...longitudes);
+        // const yMax = Math.max(...latitudes);
+        // const yMin = Math.min(...latitudes);
+
+        // 根据canvas宽高计算缩放级别
+        const xScale = width / (xMax - xMin);
+        const yScale = height / (yMax - yMin);
+        const scale = (xScale < yScale ? xScale : yScale) * 0.9;
+        console.log(1, scale);
+        // 计算偏移量
+        const xoffset = (width - Math.abs(xMax - xMin) * scale) / 2;
+        const yoffset = (height - Math.abs(yMax - yMin) * scale) / 2;
+
+        const coords = data.map((item, index) => ({
+          type: item.type,
+          fill: item.fill || getRandomColor(),
+          coordinates: item.coordinates.map((coordinate, index) => {
+            switch (item.type) {
+              case "Point":
+                if (scale === Infinity) return coordinate;
+                return typeof coordinate === "number"
+                  ? index === 0
+                    ? (coordinate - xMin) * scale + xoffset
+                    : (yMax - coordinate) * scale + yoffset
+                  : [
+                      (coordinate[0] - xMin) * scale + xoffset,
+                      (yMax - coordinate[1]) * scale + yoffset,
+                    ];
+
+                return;
+
+              case "LineString":
+                return [
+                  (coordinate[0] - xMin) * scale + xoffset,
+                  (yMax - coordinate[1]) * scale + yoffset,
+                ];
+              case "MultiLineString":
+                return coordinate.map((coord) => [
+                  (coord[0] - xMin) * scale + xoffset,
+                  (yMax - coord[1]) * scale + yoffset,
+                ]);
+              case "Polygon":
+                return coordinate.map((coord) => [
+                  (coord[0] - xMin) * scale + xoffset,
+                  (yMax - coord[1]) * scale + yoffset,
+                ]);
+
+              case "MultiPolygon":
+                return coordinate.map((coord) =>
+                  coord.map((c) => [
+                    (c[0] - xMin) * scale + xoffset,
+                    (yMax - c[1]) * scale + yoffset,
+                  ])
+                );
+              default:
+                return [];
+            }
+          }),
+        }));
+
+        ctx.clearRect(0, 0, width, height);
+        coords.forEach((coord) => {
+          switch (coord.type) {
+            case "Point":
+              if (scale === Infinity) {
+                let image = new Image();
+                image.src = "/img/avatar.png";
+                image.onload = () => {
+                  ctx.clearRect(0, 0, width, height);
+                  ctx.drawImage(image, width / 2 - 12, height / 2 - 12, 24, 24);
+                  ctx.fill();
+                };
+                ctx.fill();
+              } else {
+                if (typeof coord.coordinates[1] === "number") {
+                  ctx.beginPath();
+                  ctx.arc(
+                    coord.coordinates[0],
+                    coord.coordinates[1],
+                    4,
+                    0,
+                    Math.PI * 2
+                  );
+                  ctx.fillStyle = coord.fill;
+                  ctx.fill();
+                } else {
+                  coord.coordinates.forEach((c) => {
+                    ctx.beginPath();
+                    ctx.arc(c[0], c[1], 4, 0, Math.PI * 2);
+                    ctx.fillStyle = coord.fill;
+                    ctx.fill();
+                  });
+                }
+              }
+              break;
+            case "LineString":
+              ctx.beginPath();
+              ctx.fillStyle = coord.fill;
+              ctx.strokeStyle = stroke;
+              ctx.fillOpacity = 0.2;
+              ctx.moveTo(coord.coordinates[0][0], coord.coordinates[0][1]);
+              coord.coordinates.forEach((c) => {
+                ctx.lineTo(c[0], c[1]);
+              });
+              ctx.stroke();
+              ctx.fill();
+              break;
+            case "MultiLineString":
+              coord.coordinates.forEach((c, index) => {
+                ctx.beginPath();
+                ctx.strokeStyle = stroke;
+                ctx.fillOpacity = 0.2;
+                ctx.moveTo(c[0][0], c[0][1]);
+                c.forEach((_c) => {
+                  ctx.lineTo(_c[0], _c[1]);
+                });
+                ctx.stroke();
+              });
+              break;
+            case "Polygon":
+              coord.coordinates.forEach((c, index) => {
+                ctx.beginPath();
+                ctx.beginPath();
+                ctx.fillStyle = coord.fill;
+                ctx.beginPath();
+                ctx.fillStyle = coord.fill;
+                ctx.strokeStyle = stroke;
+                ctx.fillOpacity = 0.2;
+                ctx.moveTo(c[0][0], c[0][1]);
+                c.forEach((_c) => {
+                  ctx.lineTo(_c[0], _c[1]);
+                });
+                ctx.closePath();
+                ctx.stroke();
+                ctx.fill();
+              });
+              break;
+            case "MultiPolygon":
+              coord.coordinates.forEach((c) => {
+                c.forEach((_c) => {
+                  ctx.beginPath();
+                  ctx.fillStyle = coord.fill;
+                  ctx.strokeStyle = stroke;
+                  ctx.fillOpacity = 0.2;
+                  ctx.moveTo(_c[0][0], _c[0][1]);
+                  _c.forEach((__c) => {
+                    ctx.lineTo(__c[0], __c[1]);
+                  });
+                  ctx.closePath();
+                  ctx.stroke();
+                  ctx.fill();
+                });
+              });
+              break;
+            default:
+              break;
+          }
+        });
+      });
+    </script>
+  </body>
+</html>
