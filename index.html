@@ -62,7 +62,7 @@
         return promise;
       };
 
-      getJSON("https://cdn.emooa.com/file/geojson/100000.json").then((v) => {
+      getJSON("https://cdn.emooa.com/geojson/100000.json").then((v) => {
         const data = v.features.map((item) => item.geometry);
         const longitudes = [].concat(
           ...[].concat(
